@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employer Anti-Fraud OSINT Engine — Stage 2</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #121826;
+      --surface-2: #192235;
+      --border: #26324b;
+      --text: #e6edf7;
+      --muted: #8b9bb8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #10b981;
+      --green-bg: rgba(16, 185, 129, 0.14);
+      --yellow: #f59e0b;
+      --yellow-bg: rgba(245, 158, 11, 0.14);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.15);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: radial-gradient(circle at top right, #16223b 0%, var(--bg) 52%);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .container { max-width: 1120px; margin: 0 auto; padding: 24px 18px 64px; }
+    header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      gap: 14px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .shield {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb, #10b981);
+      display: grid; place-items: center; font-weight: 800; font-size: 20px; color: #fff;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
+    }
+    h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    .subtitle { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .health-pill {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+      font-size: 12px; color: var(--muted);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .dot.err { background: var(--red); }
+
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .tab-btn {
+      padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); cursor: pointer; font-weight: 600; font-size: 14px;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover { color: var(--text); border-color: #3c4f75; }
+    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; margin-bottom: 18px; box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+    }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    @media (max-width: 760px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    input[type="text"], input[type="url"], input[type="email"], select, textarea {
+      width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text); font-size: 14px; font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    textarea { min-height: 110px; resize: vertical; }
+
+    .dropzone {
+      border: 2px dashed #34476b; border-radius: 10px; padding: 22px; text-align: center;
+      background: rgba(25, 34, 53, 0.55); cursor: pointer; transition: all 0.15s ease;
+    }
+    .dropzone.dragover { border-color: var(--accent); background: rgba(59, 130, 246, 0.12); }
+    .dropzone input { display: none; }
+    .file-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; justify-content: center; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+      border-radius: 999px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border);
+    }
+    .chip button {
+      background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 14px;
+    }
+
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+    .btn {
+      padding: 11px 20px; border-radius: 9px; border: none; font-weight: 600; font-size: 14px;
+      cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: var(--red-bg); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); padding: 6px 10px; font-size: 12px; }
+    .btn-danger:hover { background: rgba(239,68,68,0.28); }
+    .checkbox-row { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result Section */
+    .verdict-header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px;
+    }
+    .score-box { display: flex; align-items: center; gap: 18px; }
+    .score-ring {
+      width: 82px; height: 82px; border-radius: 50%; display: grid; place-items: center;
+      font-size: 24px; font-weight: 800; border: 5px solid var(--border);
+    }
+    .status-GREEN .score-ring { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+    .status-YELLOW .score-ring { border-color: var(--yellow); color: var(--yellow); background: var(--yellow-bg); }
+    .status-RED .score-ring { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .badge-GREEN { background: var(--green-bg); color: var(--green); border: 1px solid rgba(16,185,129,0.4); }
+    .badge-YELLOW { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(245,158,11,0.4); }
+    .badge-RED { background: var(--red-bg); color: #f87171; border: 1px solid rgba(239,68,68,0.45); }
+    .badge-neutral { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+    .kill-banner {
+      margin-top: 14px; padding: 12px 14px; border-radius: 9px;
+      background: var(--red-bg); border: 1px solid rgba(239, 68, 68, 0.5); color: #fecaca;
+      font-weight: 600; font-size: 13px;
+    }
+    .flag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .flag {
+      font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 3px 8px; border-radius: 6px; background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.35); color: #fcd34d;
+    }
+    .module-card {
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px;
+    }
+    .module-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .bar-track { height: 7px; border-radius: 99px; background: #0d1320; overflow: hidden; margin: 8px 0 10px; }
+    .bar-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.3s ease; }
+    .reasoning { font-size: 13px; color: #cbd5e1; margin: 8px 0; }
+    details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 8px; }
+    pre {
+      background: #0a0f18; border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+      overflow-x: auto; font-size: 11px; color: #93c5fd; max-height: 260px;
+    }
+    .links-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+    .links-list a {
+      color: #60a5fa; text-decoration: none; font-size: 13px; word-break: break-all;
+    }
+    .links-list a:hover { text-decoration: underline; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    tr.clickable:hover { background: rgba(59,130,246,0.08); cursor: pointer; }
+    .error-msg {
+      padding: 12px 14px; border-radius: 9px; background: var(--red-bg); border: 1px solid rgba(239,68,68,0.45);
+      color: #fecaca; margin-bottom: 14px; font-size: 13px;
+    }
+    .muted { color: var(--muted); font-size: 13px; }
+    .extracted-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px;
+      padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="shield">✓</div>
+        <div>
+          <h1>Employer Anti-Fraud OSINT Engine</h1>
+          <div class="subtitle">Stage 2 · Госреестры CZ/PL + WHOIS/Краулер + Claude Web Search + Разбор URL/PDF/DOCX/Скриншотов</div>
+        </div>
+      </div>
+      <div class="health-pill" id="healthPill">
+        <span class="dot" id="healthDot"></span>
+        <span id="healthText">Проверка статуса...</span>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="intake">Умный разбор (URL / Файлы / Скриншоты)</button>
+      <button class="tab-btn" data-tab="manual">Ручная форма (API)</button>
+      <button class="tab-btn" data-tab="history">История проверок</button>
+      <button class="tab-btn" data-tab="blacklist">Чёрный список</button>
+    </div>
+
+    <div id="errorBox" class="error-msg" style="display:none;"></div>
+
+    <!-- TAB 1: MULTIMODAL INTAKE -->
+    <section id="tab-intake" class="tab-panel active">
+      <div class="card">
+        <form id="intakeForm">
+          <div class="grid-2" style="margin-bottom:14px;">
+            <div>
+              <label for="intakeUrl">Ссылка на вакансию / пост (Layboard, EURES, Instagram, сайт)</label>
+              <input id="intakeUrl" type="url" placeholder="https://layboard.com/vakansiya/... или https://www.instagram.com/p/..." />
+            </div>
+            <div>
+              <label for="intakeCountry">Страна (необязательно — определится сама)</label>
+              <select id="intakeCountry">
+                <option value="">Автоопределение</option>
+                <option value="CZ">CZ — Чехия (ARES)</option>
+                <option value="PL">PL — Польша (MF NIP)</option>
+                <option value="DE">DE — Германия</option>
+                <option value="AT">AT — Австрия</option>
+                <option value="SK">SK — Словакия</option>
+                <option value="KZ">KZ — Казахстан</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label>Файлы: скриншоты вакансии (.png/.jpg), договоры (.docx), презентации (.pdf)</label>
+            <div class="dropzone" id="dropzone">
+              <input type="file" id="fileInput" multiple accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.docx,.txt" />
+              <div style="font-weight:600;margin-bottom:4px;">Перетащите файлы сюда или нажмите для выбора</div>
+              <div class="muted">Поддерживаются изображения, Word (.docx), PDF (включая слайды) и текст</div>
+              <div class="file-chips" id="fileChips"></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label for="intakeRawText">Или вставьте текст вакансии / переписки</label>
+            <textarea id="intakeRawText" placeholder="Вставьте текст объявления, условия договора, контакты из WhatsApp/Telegram..."></textarea>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:6px;">
+            <div>
+              <label for="intakeCompany">Название компании (если хотите уточнить)</label>
+              <input id="intakeCompany" type="text" placeholder="Необязательно" />
+            </div>
+            <div>
+              <label for="intakeRegId">IČO / NIP / БИН (если известен)</label>
+              <input id="intakeRegId" type="text" placeholder="Необязательно" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" id="intakeSubmit">Проверить работодателя</button>
+            <label class="checkbox-row">
+              <input type="checkbox" id="intakeForce" /> Игнорировать кэш (force_refresh)
+            </label>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 2: STRUCTURED MANUAL FORM -->
+    <section id="tab-manual" class="tab-panel">
+      <div class="card">
+        <form id="manualForm">
+          <div class="grid-3" style="margin-bottom:14px;">
+            <div>
+              <label for="mCompany">Название компании *</label>
+              <input id="mCompany" type="text" required placeholder="Seznam.cz, a.s." />
+            </div>
+            <div>
+              <label for="mCountry">Страна *</label>
+              <select id="mCountry">
+                <option value="CZ">CZ — Чехия (ARES)</option>
+                <option value="PL">PL — Польша (MF NIP)</option>
+                <option value="DE">DE — Германия</option>
+                <option value="AT">AT — Австрия</option>
+                <option value="SK">SK — Словакия</option>
+                <option value="KZ">KZ — Казахстан</option>
+              </select>
+            </div>
+            <div>
+              <label for="mRegId">Рег. номер (IČO / NIP / БИН) *</label>
+              <input id="mRegId" type="text" required placeholder="26168685 или UNKNOWN" />
+            </div>
+          </div>
+
+          <div class="grid-3" style="margin-bottom:14px;">
+            <div>
+              <label for="mWebsite">Официальный сайт</label>
+              <input id="mWebsite" type="text" placeholder="https://o.seznam.cz" />
+            </div>
+            <div>
+              <label for="mEmail">Контактный Email</label>
+              <input id="mEmail" type="email" placeholder="info@firma.seznam.cz" />
+            </div>
+            <div>
+              <label for="mPhone">Телефон</label>
+              <input id="mPhone" type="text" placeholder="+420234694111" />
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:14px;">
+            <div>
+              <label for="mType">Тип заявителя</label>
+              <select id="mType">
+                <option value="direct_employer">Прямой работодатель (direct_employer)</option>
+                <option value="agency">Агентство / посредник (agency)</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <label class="checkbox-row">
+                <input type="checkbox" id="mForce" /> Игнорировать кэш (force_refresh)
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label for="mVacancy">Текст вакансии / условия</label>
+            <textarea id="mVacancy" placeholder="Зарплата, должность, город, визовые условия..."></textarea>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" id="manualSubmit">Запустить проверку</button>
+            <button type="button" class="btn btn-secondary" id="fillSeznamBtn">Заполнить пример (Seznam.cz)</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 3: HISTORY -->
+    <section id="tab-history" class="tab-panel">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
+          <strong>Последние проверки</strong>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="historyFilter" style="width:auto;">
+              <option value="">Все статусы</option>
+              <option value="GREEN">GREEN</option>
+              <option value="YELLOW">YELLOW</option>
+              <option value="RED">RED</option>
+            </select>
+            <button class="btn btn-secondary" type="button" id="refreshHistoryBtn">Обновить</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Статус</th>
+                <th>Балл</th>
+                <th>Уверенность</th>
+                <th>Компания / Сводка</th>
+                <th>Дата</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr><td colspan="5" class="muted">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: BLACKLIST -->
+    <section id="tab-blacklist" class="tab-panel">
+      <div class="card">
+        <form id="blacklistForm" style="margin-bottom:18px;">
+          <div class="grid-3">
+            <div>
+              <label for="blType">Тип сущности</label>
+              <select id="blType">
+                <option value="phone">phone (Телефон)</option>
+                <option value="reg_id">reg_id (IČO / NIP / БИН)</option>
+                <option value="domain">domain (Домен сайта)</option>
+                <option value="email">email (Почта)</option>
+              </select>
+            </div>
+            <div>
+              <label for="blValue">Значение</label>
+              <input id="blValue" type="text" required placeholder="+420 600 000 999" />
+            </div>
+            <div>
+              <label for="blReason">Причина блокировки</label>
+              <input id="blReason" type="text" required placeholder="Предоплата за визу / мошенничество" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary">Добавить в чёрный список</button>
+          </div>
+        </form>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Тип</th>
+                <th>Нормализованное значение</th>
+                <th>Причина</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody id="blacklistBody">
+              <tr><td colspan="4" class="muted">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- LIVE VERDICT REPORT CONTAINER -->
+    <div id="resultContainer" style="display:none;"></div>
+  </div>
+
+  <script>
+    const state = { files: [] };
+
+    function esc(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function safeHref(url) {
+      if (typeof url !== "string") return "";
+      const trimmed = url.trim();
+      return /^https?:\/\//i.test(trimmed) ? trimmed : "";
+    }
+
+    function showError(msg) {
+      const box = document.getElementById("errorBox");
+      if (!msg) { box.style.display = "none"; box.textContent = ""; return; }
+      box.textContent = msg;
+      box.style.display = "block";
+    }
+
+    // Tabs
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        const tab = btn.dataset.tab;
+        document.getElementById("tab-" + tab).classList.add("active");
+        showError("");
+        if (tab === "history") loadHistory();
+        if (tab === "blacklist") loadBlacklist();
+      });
+    });
+
+    // Health check
+    async function loadHealth() {
+      try {
+        const res = await fetch("/health");
+        const data = await res.json();
+        const dot = document.getElementById("healthDot");
+        const txt = document.getElementById("healthText");
+        if (res.ok && data.status === "ok") {
+          dot.classList.remove("err");
+          const claude = data.configured_integrations?.claude_osint ? "Claude OSINT ON" : "Claude OFF";
+          txt.textContent = `v${data.version} · ${data.database_backend} · ${claude}`;
+        } else {
+          dot.classList.add("err");
+          txt.textContent = "Degraded";
+        }
+      } catch {
+        document.getElementById("healthDot").classList.add("err");
+        document.getElementById("healthText").textContent = "Нет связи с сервером";
+      }
+    }
+
+    // File Dropzone
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const fileChips = document.getElementById("fileChips");
+
+    function renderFileChips() {
+      fileChips.innerHTML = "";
+      state.files.forEach((f, idx) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.innerHTML = `${esc(f.name)} (${Math.max(1, Math.round(f.size / 1024))} KB) <button type="button" data-idx="${idx}">×</button>`;
+        chip.querySelector("button").addEventListener("click", (e) => {
+          e.stopPropagation();
+          state.files.splice(idx, 1);
+          renderFileChips();
+        });
+        fileChips.appendChild(chip);
+      });
+    }
+
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault(); dropzone.classList.remove("dragover");
+      for (const f of e.dataTransfer.files) state.files.push(f);
+      renderFileChips();
+    });
+    fileInput.addEventListener("change", () => {
+      for (const f of fileInput.files) state.files.push(f);
+      fileInput.value = "";
+      renderFileChips();
+    });
+
+    // Quick blacklist button handler
+    async function quickBlacklist(entityType, value) {
+      const reason = prompt(`Добавить ${entityType} (${value}) в чёрный список? Укажите причину:`, "Подтверждённый мошенник / скам-вакансия");
+      if (!reason) return;
+      try {
+        const res = await fetch("/api/v1/blacklist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entity_type: entityType, value, reason }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Ошибка добавления");
+        alert(`Добавлено в чёрный список: ${data.entity_type} = ${data.value}`);
+      } catch (err) {
+        alert("Ошибка: " + err.message);
+      }
+    }
+    window.quickBlacklist = quickBlacklist;
+
+    // Render Verification Response
+    function renderResult(report, extractedInput = null, intakeSources = null) {
+      const container = document.getElementById("resultContainer");
+      const status = report.status || "RED";
+      const confPct = Math.round((report.confidence_score || 0) * 100);
+
+      let extractedHtml = "";
+      if (extractedInput) {
+        const quickBtns = [];
+        if (extractedInput.reg_id && extractedInput.reg_id !== "UNKNOWN") {
+          quickBtns.push(`<button class="btn btn-danger" type="button" onclick="quickBlacklist('reg_id', '${esc(extractedInput.reg_id)}')">Бан IČO/NIP</button>`);
+        }
+        if (extractedInput.contact_phone) {
+          quickBtns.push(`<button class="btn btn-danger" type="button" onclick="quickBlacklist('phone', '${esc(extractedInput.contact_phone)}')">Бан телефона</button>`);
+        }
+        if (extractedInput.contact_email) {
+          quickBtns.push(`<button class="btn btn-danger" type="button" onclick="quickBlacklist('email', '${esc(extractedInput.contact_email)}')">Бан email</button>`);
+        }
+        if (extractedInput.website_url) {
+          quickBtns.push(`<button class="btn btn-danger" type="button" onclick="quickBlacklist('domain', '${esc(extractedInput.website_url)}')">Бан домена</button>`);
+        }
+        extractedHtml = `
+          <div class="extracted-bar">
+            <span class="badge badge-neutral">Извлечено: ${esc(extractedInput.company_name)} (${esc(extractedInput.country_code)} · ${esc(extractedInput.reg_id)})</span>
+            ${extractedInput.contact_email ? `<span class="badge badge-neutral">${esc(extractedInput.contact_email)}</span>` : ""}
+            ${extractedInput.contact_phone ? `<span class="badge badge-neutral">${esc(extractedInput.contact_phone)}</span>` : ""}
+            ${intakeSources && intakeSources.length ? `<span class="muted">Источники: ${esc(intakeSources.join(", "))}</span>` : ""}
+            <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">${quickBtns.join("")}</span>
+          </div>
+        `;
+      }
+
+      const ksHtml = (report.kill_switches_triggered && report.kill_switches_triggered.length)
+        ? `<div class="kill-banner">⛔ СРАБОТАЛ ЖЁСТКИЙ KILL-SWITCH: ${esc(report.kill_switches_triggered.join(", "))}</div>`
+        : "";
+
+      const flagsHtml = (report.red_flags && report.red_flags.length)
+        ? `<div class="flag-list">${report.red_flags.map(f => `<span class="flag">${esc(f)}</span>`).join("")}</div>`
+        : `<div class="muted" style="margin-top:10px;">Красных флагов не обнаружено.</div>`;
+
+      const mods = [
+        { key: "gov_registry", title: "Модуль A · Госреестр (CZ / PL)", data: report.modules.gov_registry },
+        { key: "domain_site", title: "Модуль B · Домен / WHOIS / Краулер", data: report.modules.domain_site },
+        { key: "claude_osint", title: "Модуль C · Claude OSINT + Веб-поиск", data: report.modules.claude_osint },
+      ];
+
+      const modsHtml = mods.map(m => {
+        const pct = m.data.max_score > 0 ? Math.round((m.data.score / m.data.max_score) * 100) : 0;
+        const badgeCls = m.data.status === "SUCCESS" ? "badge-GREEN" : (m.data.status === "UNAVAILABLE" ? "badge-neutral" : "badge-RED");
+        const reasoning = m.data.details?.reasoning ? `<div class="reasoning">${esc(m.data.details.reasoning)}</div>` : "";
+        const breakdown = m.data.details?.score_breakdown
+          ? `<div class="muted" style="font-size:12px;">Разбивка: ${Object.entries(m.data.details.score_breakdown).map(([k,v]) => `${esc(k)}=<b>${esc(v)}</b>`).join(" · ")}</div>`
+          : "";
+        return `
+          <div class="module-card">
+            <div class="module-top">
+              <strong style="font-size:13px;">${esc(m.title)}</strong>
+              <span class="badge ${badgeCls}">${esc(m.data.status)}</span>
+            </div>
+            <div style="font-size:18px;font-weight:800;">${esc(m.data.score)} <span class="muted">/ ${esc(m.data.max_score)}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+            ${breakdown}
+            ${reasoning}
+            <details>
+              <summary>Подробные данные (JSON)</summary>
+              <pre>${esc(JSON.stringify(m.data.details || {}, null, 2))}</pre>
+            </details>
+          </div>
+        `;
+      }).join("");
+
+      const validLinks = (report.evidence_links || []).map(safeHref).filter(Boolean);
+      const linksHtml = validLinks.length
+        ? `<ul class="links-list">${validLinks.map(u => `<li><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a></li>`).join("")}</ul>`
+        : `<div class="muted">Ссылки не найдены.</div>`;
+
+      // Conditional Recruiter / Phone Verification Card
+      const cd = report.modules?.claude_osint?.details || {};
+      const cvStatus = cd.contact_verification_status || "NOT_NEEDED";
+      let contactCardHtml = "";
+      if (cvStatus && cvStatus !== "NOT_NEEDED") {
+        const cvMeta = {
+          VERIFIED_EXACT: { label: "КОНТАКТ ПОДТВЕРЖДЁН НА ОФИЦИАЛЬНОМ САЙТЕ", cls: "badge-GREEN" },
+          VERIFIED_CORPORATE_BLOCK: { label: "ПОДТВЕРЖДЁН КОРПОРАТИВНЫЙ БЛОК НОМЕРОВ", cls: "badge-YELLOW" },
+          UNVERIFIED: { label: "КОНТАКТ НЕ НАЙДЕН НА ОФИЦИАЛЬНОМ САЙТЕ", cls: "badge-RED" },
+        }[cvStatus] || { label: cvStatus, cls: "badge-neutral" };
+        const copyId = "copyTpl_" + Math.random().toString(36).slice(2, 8);
+        contactCardHtml = `
+          <div class="card" style="border-color: rgba(59,130,246,0.45);">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+              <strong>Проверка контакта / рекрутера</strong>
+              <span class="badge ${cvMeta.cls}">${esc(cvMeta.label)}</span>
+            </div>
+            ${cd.contact_verification_evidence ? `<div style="font-size:13px;margin-bottom:8px;"><strong>Что найдено:</strong> ${esc(cd.contact_verification_evidence)}</div>` : ""}
+            ${cd.user_action_advice ? `<div style="font-size:14px;padding:10px 12px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:10px;">${esc(cd.user_action_advice)}</div>` : ""}
+            ${cd.official_verification_contact ? `<div class="muted" style="margin-bottom:10px;"><strong>Официальные контакты компании для перепроверки:</strong> ${esc(cd.official_verification_contact)}</div>` : ""}
+            ${cd.verification_message_local ? `
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <label style="margin:0;">Готовое письмо / сообщение на языке работодателя (скопируйте и отправьте на официальную почту):</label>
+                  <button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="navigator.clipboard.writeText(document.getElementById('${copyId}').textContent).then(() => this.textContent='Скопировано ✓')">Скопировать текст</button>
+                </div>
+                <pre id="${copyId}" style="white-space:pre-wrap;color:#e6edf7;font-size:13px;">${esc(cd.verification_message_local)}</pre>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="card status-${esc(status)}">
+          <div class="verdict-header">
+            <div class="score-box">
+              <div class="score-ring">${esc(report.trust_score)}</div>
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                  <span class="badge badge-${esc(status)}">${esc(status)}</span>
+                  <span class="badge badge-neutral">Уверенность: ${confPct}%</span>
+                  ${report.cached ? `<span class="badge badge-neutral">ИЗ КЭША</span>` : `<span class="badge badge-neutral">СВЕЖАЯ ПРОВЕРКА</span>`}
+                </div>
+                <div style="font-size:14px;max-width:660px;">${esc(report.summary)}</div>
+                <div class="muted" style="font-size:11px;margin-top:4px;">ID: ${esc(report.verification_id)}</div>
+              </div>
+            </div>
+          </div>
+          ${ksHtml}
+          ${flagsHtml}
+          ${extractedHtml}
+        </div>
+
+        ${contactCardHtml}
+
+        <div class="grid-3" style="margin-bottom:18px;">${modsHtml}</div>
+
+        <div class="card">
+          <strong>Найденные доказательства и источники (${validLinks.length})</strong>
+          ${linksHtml}
+        </div>
+      `;
+      container.style.display = "block";
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // Intake submit
+    document.getElementById("intakeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showError("");
+      const btn = document.getElementById("intakeSubmit");
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Анализируем (ARES + Краулер + Claude)...`;
+
+      try {
+        const fd = new FormData();
+        const url = document.getElementById("intakeUrl").value.trim();
+        const rawText = document.getElementById("intakeRawText").value.trim();
+        const country = document.getElementById("intakeCountry").value;
+        const company = document.getElementById("intakeCompany").value.trim();
+        const regId = document.getElementById("intakeRegId").value.trim();
+        const force = document.getElementById("intakeForce").checked;
+
+        if (url) fd.append("url", url);
+        if (rawText) fd.append("raw_text", rawText);
+        if (country) fd.append("country_code", country);
+        if (company) fd.append("company_name", company);
+        if (regId) fd.append("reg_id", regId);
+        fd.append("force_refresh", String(force));
+        for (const f of state.files) fd.append("files", f, f.name);
+
+        const res = await fetch("/api/v1/verify/intake", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        renderResult(data.verification, data.extracted_input, data.intake_sources);
+      } catch (err) {
+        showError("Ошибка проверки: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Проверить работодателя";
+      }
+    });
+
+    // Manual form submit
+    document.getElementById("fillSeznamBtn").addEventListener("click", () => {
+      document.getElementById("mCompany").value = "Seznam.cz, a.s.";
+      document.getElementById("mCountry").value = "CZ";
+      document.getElementById("mRegId").value = "26168685";
+      document.getElementById("mWebsite").value = "https://o.seznam.cz";
+      document.getElementById("mEmail").value = "info@firma.seznam.cz";
+      document.getElementById("mPhone").value = "+420234694111";
+      document.getElementById("mType").value = "direct_employer";
+      document.getElementById("mVacancy").value = "Backend Python Developer in Prague 5 (Radlicka). Full-time HPP contract, 95,000 CZK/month gross, 5 weeks holiday.";
+    });
+
+    document.getElementById("manualForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showError("");
+      const btn = document.getElementById("manualSubmit");
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Выполняется проверка...`;
+      try {
+        const payload = {
+          company_name: document.getElementById("mCompany").value.trim(),
+          country_code: document.getElementById("mCountry").value,
+          reg_id: document.getElementById("mRegId").value.trim(),
+          website_url: document.getElementById("mWebsite").value.trim() || null,
+          contact_email: document.getElementById("mEmail").value.trim() || null,
+          contact_phone: document.getElementById("mPhone").value.trim() || null,
+          applicant_type: document.getElementById("mType").value,
+          vacancy_text: document.getElementById("mVacancy").value.trim(),
+          force_refresh: document.getElementById("mForce").checked,
+        };
+        const res = await fetch("/api/v1/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        renderResult(data, payload, ["manual_form"]);
+      } catch (err) {
+        showError("Ошибка проверки: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Запустить проверку";
+      }
+    });
+
+    // History
+    async function loadHistory() {
+      const tbody = document.getElementById("historyBody");
+      const statusFilter = document.getElementById("historyFilter").value;
+      const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">Загрузка...</td></tr>`;
+      try {
+        const res = await fetch("/api/v1/verifications" + qs);
+        const rows = await res.json();
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">Пока нет сохранённых проверок.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(r => `
+          <tr class="clickable" data-id="${esc(r.verification_id)}">
+            <td><span class="badge badge-${esc(r.status)}">${esc(r.status)}</span></td>
+            <td><strong>${esc(r.trust_score)}</strong> / 100</td>
+            <td>${Math.round(r.confidence_score * 100)}%</td>
+            <td>
+              ${r.company_name ? `<strong>${esc(r.company_name)}</strong> (${esc(r.country_code)} ${esc(r.reg_id)})<br/>` : ""}
+              <span class="muted">${esc(r.summary.slice(0, 140))}</span>
+            </td>
+            <td class="muted">${new Date(r.created_at).toLocaleString()}</td>
+          </tr>
+        `).join("");
+        tbody.querySelectorAll("tr.clickable").forEach(tr => {
+          tr.addEventListener("click", async () => {
+            const resp = await fetch("/api/v1/verify/" + encodeURIComponent(tr.dataset.id));
+            if (resp.ok) renderResult(await resp.json());
+          });
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">Ошибка загрузки истории: ${esc(err.message)}</td></tr>`;
+      }
+    }
+    document.getElementById("historyFilter").addEventListener("change", loadHistory);
+    document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+
+    // Blacklist
+    async function loadBlacklist() {
+      const tbody = document.getElementById("blacklistBody");
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">Загрузка...</td></tr>`;
+      try {
+        const res = await fetch("/api/v1/blacklist");
+        const rows = await res.json();
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="muted">Чёрный список пуст.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(r => `
+          <tr>
+            <td><span class="badge badge-neutral">${esc(r.entity_type)}</span></td>
+            <td><code>${esc(r.value)}</code></td>
+            <td>${esc(r.reason)}</td>
+            <td><button class="btn btn-danger" type="button" data-del="${esc(r.id)}">Удалить</button></td>
+          </tr>
+        `).join("");
+        tbody.querySelectorAll("[data-del]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const resp = await fetch("/api/v1/blacklist/" + encodeURIComponent(btn.dataset.del), { method: "DELETE" });
+            if (resp.ok) loadBlacklist();
+          });
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" class="muted">Ошибка: ${esc(err.message)}</td></tr>`;
+      }
+    }
+
+    document.getElementById("blacklistForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showError("");
+      try {
+        const res = await fetch("/api/v1/blacklist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            entity_type: document.getElementById("blType").value,
+            value: document.getElementById("blValue").value.trim(),
+            reason: document.getElementById("blReason").value.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        document.getElementById("blValue").value = "";
+        document.getElementById("blReason").value = "";
+        loadBlacklist();
+      } catch (err) {
+        showError("Не удалось добавить в чёрный список: " + err.message);
+      }
+    });
+
+    loadHealth();
+  </script>
+</body>
+</html>
